@@ -1,138 +1,81 @@
-import KuznetsovEdenConjectureDefinitions
+import KuznetsovEdenConjecture.KEStatementDefinitions
 
 /-!
-# Kuznetsov–Eden conjectures
+# Kuznetsov--Eden conjectures
 
 ## Sources
 
-[R] N. V. Kuznetsov, G. A. Leonov, T. N. Mokaev, A. Prasad,
-    and M. D. Shrimali, "Finite-time Lyapunov dimension and hidden
-    attractor of the Rabinovich system", Nonlinear Dynamics 92 (2018),
-    267–285. DOI: 10.1007/s11071-018-4054-z.
-    https://link.springer.com/article/10.1007/s11071-018-4054-z
+[K] Kuznetsov (2016), footnote 7, printed p.12:
+https://arxiv.org/pdf/1602.05410v3
 
-    Primary wording for the self-excited conjecture: §5.3, p. 278,
-    paragraph following equation (26).
-    Attractors and their classification: §3 and Definition 1.
-    Dimension definitions: §5.1, equations (12), (13), and (15).
-    Preprint: https://arxiv.org/abs/1504.04723
+[R] Kuznetsov et al. (2018), paragraph following equation (26):
+https://arxiv.org/pdf/1504.04723
 
-[W] Wikipedia, "Eden's conjecture", subsection
-    "Kuznetsov–Eden's conjecture", revision 1372866622.
-    https://en.wikipedia.org/w/index.php?title=Eden%27s_conjecture&oldid=1372866622
+[W] https://en.wikipedia.org/w/index.php?title=Eden%27s_conjecture&oldid=1372866622
 
-    Provisional wording source for the separate hidden-attractor conjecture.
-    An equivalent standalone primary-source passage has not been verified.
+## Formulation
 
-[K] N. V. Kuznetsov, "The Lyapunov dimension and its estimation via
-    the Leonov method", Physics Letters A 380 (2016), 2142–2149.
-    https://arxiv.org/pdf/1602.05410v3
+The self-excited statement uses a non-strict dimension bound and requires
+an unstable equilibrium whose unstable set intersects the attractor's basin.
+It omits the additional visualization condition appearing in K and R.
+Consequently, its equilibrium conclusion is weaker than those source
+formulations. K uses a strict comparison; R uses a non-strict comparison.
 
-    Background on finite-dimensional smooth dynamical systems and dimension
-    conventions. The strict comparison in this preprint's footnote 7 is
-    distinct from the non-strict comparison in [R].
+Typicality means validity on a dense G-delta class in C1(R^n,R^n), equipped
+with the compact-open C1 topology. The class may depend on dimension and
+time kind. This is an explicit Baire-generic interpretation; the conjecture
+passages do not specify a topology or a residual-class definition.
 
-## Mathematical scope
+The hidden statement requires a periodic candidate whose local finite-time
+dimension equals the attractor's set dimension. Local dimension takes the
+time liminf at a point; set dimension takes the spatial supremum before the
+time liminf. Both conjectures use this convention and are closed propositions.
 
-The background framework represents C¹ evolution on an open subset of ℝⁿ,
-with either continuous or discrete time. Continuous-time evolution is
-required to arise from an autonomous C¹ differential equation. Discrete-time
-maps are iterates of the time-one map. All singular values are obtained
-from the actual derivatives of these maps.
-
-The local-attractor convention is compactness, invariance, local attraction,
-and inclusion-minimality, following the convention discussed in [R], §3.
-The dimension formulas of [R] are written with ambient dimension n in place
-of 3. Their use for maps follows the finite-dimensional framework of [K].
-
-The background structure permits singular derivatives, whereas [K] imposes
-nonsingularity in its standing assumptions. This difference in ambient scope
-remains to be resolved for a complete source-to-formalization correspondence;
-neither conjecture paragraph by itself specifies every background hypothesis.
-
-## Formalization status
-
-Four fixed declarations have admitted definition bodies:
-
-* `TypicalSystem`: no precise typicality criterion has been identified
-  in the cited conjecture passages.
-* `unstableManifold`: the intended unstable manifold Wᵘ(u_eq) has not
-  been constructed in this formalization.
-* `Visualizes`: no exact mathematical visualization criterion has been
-  identified in those passages.
-* `localLyapunovDimension`: the infinite-time pointwise convention in
-  the hidden-attractor sentence remains unresolved.
-
-These are missing definitions, not proved mathematical facts. In particular,
-`opaque` does not supply the missing semantics. They must be completed before
-these declarations constitute fully specified mathematical conjectures.
-
-The two negation theorems also have admitted proof bodies. They are unproved
-targets, not refutations. There are six `sorry` bodies in total.
-
-This file has not been compiler-checked.
+The negation theorems are unfinished proof targets containing sorry.
 -/
 
 set_option autoImplicit false
-
 noncomputable section
-
 open Set Filter
-open scoped BigOperators Topology
+open scoped Topology
 
 namespace KuznetsovEden
 
-/-! ## Conjectures -/
+/-- Non-strict equilibrium dimension bound with an unstable-set basin connection. -/
+def SelfExcitedDimensionBound (D : DynamicalSystem) : Prop :=
+  ∀ A : Set (PhaseSpace D.n), D.SelfExcitedAttractor A →
+    ∃ u_eq : PhaseSpace D.n,
+      D.UnstableEquilibrium u_eq ∧
+      (unstableManifold D u_eq ∩ D.basinOfAttraction A).Nonempty ∧
+      D.lyapunovDimension A ≤ D.equilibriumLyapunovDimension u_eq
 
-/--
-Self-excited formulation: [R], §5.3, p. 278, after equation (26).
-
-For a typical system, each self-excited attractor has Lyapunov dimension
-bounded above by that of an unstable equilibrium whose unstable manifold
-both meets its basin and visualizes it. The comparison is non-strict.
-The equilibrium is not required to lie in the attractor.
--/
+/-- Baire-generic equilibrium bound in every positive dimension and time kind. -/
 def KuznetsovEdenConjectureSelfExcited : Prop :=
-  ∀ D : DynamicalSystem, TypicalSystem D →
-    ∀ A : Set (PhaseSpace D.n), D.SelfExcitedAttractor A →
-      ∃ u_eq : PhaseSpace D.n,
-        D.UnstableEquilibrium u_eq ∧
-        (unstableManifold D u_eq ∩ D.basinOfAttraction A).Nonempty ∧
-        Visualizes D (unstableManifold D u_eq) A ∧
-        D.lyapunovDimension A ≤ D.equilibriumLyapunovDimension u_eq
+  ∀ n : ℕ, 0 < n → ∀ kind : TimeKind,
+    ∃ T : Set (C1Equation n), TypicalClass T ∧
+      ∀ F : C1Equation n, TypicalSystem T F →
+        ∀ D : DynamicalSystem, RealizesEquation F kind D →
+          SelfExcitedDimensionBound D
 
+/-- Negation of the conjecture; proof incomplete. -/
 theorem KuznetsovEdenConjectureSelfExcited_False :
     ¬ KuznetsovEdenConjectureSelfExcited := by
   sorry
 
-/--
-Hidden-attractor formulation: attributed to [W].
-An equivalent standalone primary-source passage has not been verified.
-
-The maximum local Lyapunov dimension is attained on an unstable periodic
-orbit contained in the hidden attractor. `IsGreatest` expresses both
-attainment and domination of all other values on the attractor.
-
-This follows the separate hidden-attractor sentence: it does not repeat
-typicality, allow a stationary-point alternative, or impose global attraction
-or a strange-attractor hypothesis. The local-dimension convention remains
-an admitted definition, as recorded above.
--/
+/-- The finite-time set dimension is attained on an unstable periodic orbit
+embedded in each hidden attractor. -/
 def KuznetsovEdenConjectureHidden : Prop :=
   ∀ D : DynamicalSystem,
     ∀ A : Set (PhaseSpace D.n), D.HiddenAttractor A →
       ∃ u₀ ∈ A,
         D.UnstablePeriodicOrbit u₀ ∧
         D.orbit u₀ ⊆ A ∧
-        IsGreatest (localLyapunovDimension D '' A)
-          (localLyapunovDimension D u₀)
+        localLyapunovDimension D u₀ = D.lyapunovDimension A
 
+/-- Negation of the conjecture; proof incomplete. -/
 theorem KuznetsovEdenConjectureHidden_False :
     ¬ KuznetsovEdenConjectureHidden := by
   sorry
 
 end KuznetsovEden
-
 end
-
-

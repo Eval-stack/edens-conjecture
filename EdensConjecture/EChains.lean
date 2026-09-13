@@ -1,45 +1,12 @@
-import EdensConjecture.EStatement
+import EdensConjecture.EStatements
 
 /-!
-## Implications
+# Implications between the finite-time formulations
 
-On identical system, set and local-dimension data:
-
-  stationary-or-unstable-periodic supremum attainment
-    ==> stationary-or-periodic supremum attainment;
-
-  stationary-or-periodic supremum attainment + existence of a critical path
-    ==> existence of a stationary-or-periodic critical path.
-
-Their contrapositives reverse the arrows. In particular, excluding all
-periodic solutions is stronger than excluding only unstable periodic ones.
-The elementary implications are proved below without using any `_False`
-declaration.
-
-With this fixed pointwise dimension, the global-attractor assertion and the
-strange-attractor assertion each imply their restriction to sets that are
-BOTH global and strange. Neither source's wording supplies an implication
-in the reverse direction. The strange-attractor assertion also covers local
-attractors, so it is not merely the global-attractor assertion with one extra
-hypothesis.
-
-The four named declarations do NOT form an unconditional linear hierarchy.
-The thesis definitions use a fixed-index ratio of cumulative local exponents;
-the modern definitions use pointwise Kaplan--Yorke constructions. The thesis
-and modern declarations also quantify over different ambient settings.
-Consequently, `EdensConjecture` does not imply the named thesis declaration
-merely by deleting the word "unstable": a theorem identifying the relevant
-settings and dimension functions would additionally be required.
-
-Similarly, `EdensConjectureNeedNotUnstable` concerns global attractors whereas
-`EdensConjectureQuestion1` retains the thesis's compact-invariant-set framework.
-The former implies the conclusion of Question 1 ON GLOBAL ATTRACTORS, not the
-full compact-invariant-set assertion solely by logic.
-
-# Logical comparisons between Eden conjecture formulations
-
-The proofs in this file use only the positive conjecture hypotheses and the
-defining predicates. In particular, none invokes an admitted negation.
+Global and embedded-strange attainment use the same finite-time local and
+set dimensions. Each restricts to sets that are both global and strange.
+The thesis declarations retain their original fixed-index dimensions; no
+identification with the modern construction is assumed.
 -/
 
 noncomputable section
@@ -51,6 +18,38 @@ namespace Eden
 
 universe u
 
+namespace ThesisSetting
+
+variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
+  [CompleteSpace H] (D : ThesisSetting H)
+
+/-- One implication that needs no comparison between different definitions
+of Lyapunov dimension: an attaining stationary/periodic solution is critical
+whenever some critical path exists. All quantities refer to the same X, N,
+mu and the same thesis local dimension.
+
+Thus, on fixed data, supremum attainment is stronger than the existential
+dimension-bound assertion. The converse is not supplied by the definitions. -/
+theorem supremumAttainment_implies_stationaryOrPeriodicCriticalPath
+    (N : ℕ) (μ : ℕ → H → ℝ)
+    (hmax : D.StationaryOrPeriodicSupremumAttainment N μ)
+    (hcrit : ∃ u : H, D.CriticalPath N μ u) :
+    ∃ u : H, D.CriticalPath N μ u ∧
+      (StationarySolution D.S u ∨ PeriodicSolution D.S u) := by
+  rcases hmax with ⟨p, hp, horbit, heq⟩
+  rcases hcrit with ⟨q, hqX, hqbound⟩
+  have hqle : (D.localLyapunovDimension N μ q : EReal) ≤
+      D.supremumLocalLyapunovDimension N μ := by
+    unfold supremumLocalLyapunovDimension
+    exact le_sSup ⟨q, hqX, rfl⟩
+  have hbound : D.douadyOesterleDimension N ≤
+      (D.localLyapunovDimension N μ p : EReal) := by
+    rw [heq]
+    exact le_trans hqbound hqle
+  exact ⟨p, ⟨hp, hbound⟩, horbit⟩
+
+end ThesisSetting
+
 /-- Instability is an extra requirement, not an alternative definition of a
 periodic solution. Removing it is a logically valid relaxation. -/
 theorem stationaryOrUnstablePeriodic_implies_stationaryOrPeriodic
@@ -61,9 +60,7 @@ theorem stationaryOrUnstablePeriodic_implies_stationaryOrPeriodic
   · exact Or.inl hs
   · exact Or.inr hp.1
 
-/-- The Wikipedia-form assertion implies attainment without an instability
-requirement on the SAME finite-dimensional data and SAME convention.
-This is not a cross-definition identification with the thesis formula. -/
+/-- Removing the instability requirement preserves the finite-time set target. -/
 theorem EdensConjecture_implies_periodicAttainment
     (h : EdensConjecture)
     {n : ℕ} (hn : 0 < n) (D : C1DynamicalSystem n)
@@ -71,15 +68,14 @@ theorem EdensConjecture_implies_periodicAttainment
     ∃ p ∈ K,
       (StationarySolution D.φ p ∨ PeriodicSolution D.φ p) ∧
       Orbit D.φ p ⊆ K ∧
-      localLyapunovDimension D p =
-        sSup (localLyapunovDimension D '' K) := by
+      localLyapunovDimension D p = lyapunovDimension D K := by
   rcases h n hn D K hK with ⟨p, hp, heligible, horbit, hdim⟩
   exact ⟨p, hp,
     stationaryOrUnstablePeriodic_implies_stationaryOrPeriodic D p heligible,
     horbit, hdim⟩
 
 /-- Contrapositive on identical finite-dimensional data: excluding all
-stationary and periodic maximizers refutes the Wikipedia-form assertion.
+stationary and periodic maximizers refutes the finite-time assertion.
 No converse is inferred. -/
 theorem noPeriodicAttainment_implies_not_EdensConjecture
     {n : ℕ} (hn : 0 < n) (D : C1DynamicalSystem n)
@@ -87,8 +83,7 @@ theorem noPeriodicAttainment_implies_not_EdensConjecture
     (hgap : ¬ ∃ p ∈ K,
       (StationarySolution D.φ p ∨ PeriodicSolution D.φ p) ∧
       Orbit D.φ p ⊆ K ∧
-      localLyapunovDimension D p =
-        sSup (localLyapunovDimension D '' K)) :
+      localLyapunovDimension D p = lyapunovDimension D K) :
     ¬ EdensConjecture := by
   intro h
   exact hgap (EdensConjecture_implies_periodicAttainment h hn D K hK)
@@ -103,8 +98,7 @@ def AttainmentOnGlobalStrangeAttractors : Prop :=
         ∃ p ∈ X,
           (StationarySolution D.φ p ∨ D.UnstablePeriodicOrbit p) ∧
           Orbit D.φ p ⊆ X ∧
-          localLyapunovDimension D p =
-            sSup (localLyapunovDimension D '' X)
+          localLyapunovDimension D p = lyapunovDimension D X
 
 /-- The global assertion implies its global-and-strange restriction. -/
 theorem EdensConjecture_implies_globalStrangeRestriction :

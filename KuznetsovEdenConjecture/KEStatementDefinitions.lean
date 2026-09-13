@@ -1,4 +1,10 @@
-import Mathlib
+import Mathlib.Analysis.InnerProductSpace.SingularValues
+import Mathlib.Analysis.InnerProductSpace.PiL2
+import Mathlib.Analysis.Calculus.ContDiff.Operations
+import Mathlib.Analysis.Calculus.ContDiff.Comp
+import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Analysis.SpecificLimits.Basic
+import Mathlib.Topology.Baire.Lemmas
 
 set_option autoImplicit false
 
@@ -9,10 +15,45 @@ open scoped BigOperators Topology
 
 namespace KuznetsovEden
 
-/--
-# Definitions
+/-!
+# Kuznetsov--Eden: explicit conventions
 
-This file seeks to define terminology that is used to state the two conjectures listed as the Kuznetsov-Eden Conjecture in `KuznetsovEdenConjecture.lean`. Definitions used for the proof of the Kuznetsov-Eden Conjecture for `EdensConjectureProof.lean` are not necessarily here.
+Lean 4.33.1; Mathlib 0df444a360eaa60ab8c11dca51a86af692955474.
+
+[R] Kuznetsov et al., Finite-time Lyapunov dimension and hidden attractor
+of the Rabinovich system, Nonlinear Dynamics 92 (2018), 267--285.
+https://arxiv.org/pdf/1504.04723
+Attractors: section 3 and Definition 1. Dimensions: equations (12), (13),
+(15). Later non-strict self-excited assertion: paragraph following equation (26).
+
+[L] Kuznetsov--Alexeeva--Leonov, Invariance of Lyapunov exponents and
+Lyapunov dimension for regular and irregular linearizations, section 2.
+https://arxiv.org/html/1410.2016v3
+
+[K] Kuznetsov, The Lyapunov dimension and its estimation via the Leonov
+method. https://arxiv.org/pdf/1602.05410v3
+The self-excited wording is based on footnote 7 (printed p.12), with the
+user-requested non-strict comparison in place of the original strict one.
+The nonsingular-derivative standing assumption is imposed below.
+
+[W] https://en.wikipedia.org/w/index.php?title=Eden%27s_conjecture&oldid=1372866622
+W supplies the separate hidden sentence; an equivalent standalone primary
+source passage has not been verified.
+
+Explicit supplementary choices, not uniquely prescribed by R/W:
+* Typicality means residual validity in a SPECIFIED topological system space.
+  The statement is parameterized by this space, rather than silently choosing
+  a topology on the proof-containing DynamicalSystem structure.
+* Visualization means an orbit from the indicated set has omega-limit A.
+* The unstable set is defined through complete backward histories converging
+  to the equilibrium. At a hyperbolic equilibrium this has the customary
+  unstable-manifold interpretation. No hyperbolicity hypothesis is inserted.
+* Pointwise dimension is the Kaplan--Yorke function of upper singular-value
+  exponents (L), not a time limit of finite-time dimensions. These constructions
+  are not identified. The real-valued exponent convention is used on compact
+  invariant sets of the nonsingular finite-dimensional systems below, where
+  the exponential growth rates are bounded. No claim about escaping orbits
+  with infinite exponents is made.
 -/
 
 /-! ## Dynamical systems -/
@@ -54,6 +95,8 @@ structure DynamicalSystem where
   C1 : ∀ t, kind.admissible t → ContDiffOn ℝ 1 (φ t) U
   continuous_time : kind = .continuous →
     ContinuousOn (fun p : ℝ × PhaseSpace n => φ p.1 p.2) ((Ici 0) ×ˢ U)
+  derivative_injective : ∀ t, kind.admissible t → 0 < t →
+    ∀ u ∈ U, Function.Injective (fderiv ℝ (φ t) u)
   generated_by_ODE : kind = .continuous →
     ∃ f : PhaseSpace n → PhaseSpace n,
       ContDiffOn ℝ 1 f U ∧
@@ -206,49 +249,61 @@ def equilibriumLyapunovDimension (u_eq : PhaseSpace D.n) : ℝ :=
 
 end DynamicalSystem
 
-/-! ## Source vocabulary and incomplete definitions -/
 
-/--
-The typical-system qualification in [R].
+/-! ## Backward histories and visualization -/
 
-Admitted definition: the cited conjecture passage does not fix a space of
-systems together with a topology, measure, or another typicality criterion.
--/
-opaque TypicalSystem : DynamicalSystem → Prop := by
-  sorry
+/-- Allowed times for a two-sided history: real times or integer times. -/
+def TimeKind.signedAdmissible (kind : TimeKind) (t : ℝ) : Prop :=
+  match kind with
+  | .continuous => True
+  | .discrete => ∃ k : ℤ, t = (k : ℝ)
 
-/--
-The unstable manifold Wᵘ(u_eq) appearing in [R].
+/-- A complete past ending at x, consistent with the given forward evolution.
+For a noninvertible map, existence of a history is required, not a selected
+inverse branch. Values at other times play no role. -/
+def BackwardHistory (D : DynamicalSystem) (x : PhaseSpace D.n)
+    (γ : ℝ → PhaseSpace D.n) : Prop :=
+  γ 0 = x ∧
+  (∀ t, D.kind.signedAdmissible t → t ≤ 0 → γ t ∈ D.U) ∧
+  (∀ t s, D.kind.signedAdmissible t → D.kind.admissible s →
+    t + s ≤ 0 → D.φ s (γ t) = γ (t + s)) ∧
+  (D.kind = .continuous → ContinuousOn γ (Iic 0))
 
-Admitted definition: the manifold's mathematical construction and its
-relation to the evolution have not been implemented here.
--/
-opaque unstableManifold (D : DynamicalSystem) :
-    PhaseSpace D.n → Set (PhaseSpace D.n) := by
-  sorry
+/-- Global unstable set; identified with W^u for hyperbolic equilibria.
+This definition does not postulate the unstable-manifold theorem. -/
+def unstableManifold (D : DynamicalSystem) (p : PhaseSpace D.n) :
+    Set (PhaseSpace D.n) :=
+  {x | D.Equilibrium p ∧ ∃ γ : ℝ → PhaseSpace D.n,
+    BackwardHistory D x γ ∧
+    Tendsto γ ((atBot : Filter ℝ) ⊓
+      Filter.principal {t | D.kind.signedAdmissible t}) (𝓝 p)}
 
-/--
-The condition that the unstable manifold W visualizes the attractor A.
+/-- Omega-limit set in the ambient Euclidean space, through allowed times. -/
+def omegaLimitSet (D : DynamicalSystem) (x : PhaseSpace D.n) :
+    Set (PhaseSpace D.n) :=
+  {y | ∀ ε : ℝ, 0 < ε → ∀ T : ℝ,
+    ∃ t : ℝ, D.kind.admissible t ∧ T ≤ t ∧ dist (D.φ t x) y < ε}
 
-Admitted definition: the cited passages do not specify an exact mathematical
-criterion for this observational qualification. Basin intersection alone is
-not substituted for it.
--/
-opaque Visualizes (D : DynamicalSystem) :
-    Set (PhaseSpace D.n) → Set (PhaseSpace D.n) → Prop := by
-  sorry
+/-- Explicit mathematical interpretation of "visualizes": a trajectory
+from W approaches A and visits every part of A arbitrarily late.
+The source does not uniquely specify this observational term. -/
+def Visualizes (D : DynamicalSystem)
+    (W A : Set (PhaseSpace D.n)) : Prop :=
+  ∃ x ∈ W ∩ D.basinOfAttraction A, omegaLimitSet D x = A
 
-/--
-The pointwise local Lyapunov dimension in [W]'s hidden-attractor sentence.
+/-- Pointwise finite-time dimension, using the same time filter as the set
+construction. The set supremum is not moved outside this time limit. -/
+def localLyapunovDimension (D : DynamicalSystem)
+    (x : PhaseSpace D.n) : ℝ :=
+  Filter.liminf (fun t => D.finiteTimeLocalLyapunovDimension t x) D.timeFilter
 
-Admitted definition: the sentence does not uniquely select an infinite-time
-pointwise convention. In particular, a time limit of finite-time dimensions
-is not identified with the Kaplan–Yorke function of upper Lyapunov exponents.
--/
-opaque localLyapunovDimension (D : DynamicalSystem) :
-    PhaseSpace D.n → ℝ := by
-  sorry
+/-! ## Typicality relative to an explicit system space -/
+
+/-- A residual class in the caller-specified topological space.
+Use the intended C1 topology (or explicitly declare a parameter-family
+interpretation). No topology or residual class is inferred from this name. -/
+def TypicalClass {X : Type*} [TopologicalSpace X] (T : Set X) : Prop :=
+  T ∈ residual X
 
 end KuznetsovEden
-
 end

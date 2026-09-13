@@ -1,1 +1,10 @@
+# Lake dependencies and build output
 /.lake/
+
+# Lean artifacts generated alongside source files
+*.olean
+*.olean.server
+*.olean.private
+*.ilean
+*.ir
+*.trace

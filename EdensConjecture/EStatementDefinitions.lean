@@ -10,7 +10,7 @@ namespace Eden
 /-!
 # Definitions
 
-This file seeks to define terminology that is used to state Eden's Conjecture and its variants in `EStatement.lean`. Definitions used for the proof of Eden's Conjecture for `EMainProof.lean` are not necessarily here.
+This file defines terminology used to state Eden's Conjecture and its variants in `EStatement.lean`. Additional proof-specific definitions are in the `MainProof` folder.
 -/
 
 /-! ## Elementary trajectory terminology -/
@@ -145,23 +145,31 @@ def kaplanYorkeDimension (n : ℕ) (rates : ℕ → ℝ) : ℝ :=
   if j = n then (n : ℝ)
   else (j : ℝ) + exponentSum rates j / |rates j|
 
-/-- Pointwise local Lyapunov dimension, with a fixed exponent-based convention:
+/-- Kaplan--Yorke dimension of the singular-value exponents at time t > 0. -/
+def finiteTimeLocalLyapunovDimension {n : ℕ}
+    (D : C1DynamicalSystem n) (t : ℝ) (u : PhaseSpace n) : ℝ :=
+  kaplanYorkeDimension n (D.finiteTimeLE t u)
 
-  LE_i(u) = limsup_{t -> infinity} log(sigma_i(D phi^t(u))) / t,
-  dim_L(u) = d_KY(LE_1(u), ..., LE_n(u)).
+/-- Spatial supremum at a fixed positive time, before taking any time limit. -/
+def finiteTimeLyapunovDimension {n : ℕ}
+    (D : C1DynamicalSystem n) (t : ℝ) (K : Set (PhaseSpace n)) : ℝ :=
+  sSup (finiteTimeLocalLyapunovDimension D t '' K)
 
-This is the pointwise Kaplan--Yorke construction in Kuznetsov--Alexeeva--Leonov,
-arXiv:1410.2016v3, section 2 and Corollary 2; see also Kuznetsov,
-arXiv:1602.05410v3, footnote 3. The limsup is taken separately for each
-singular-value exponent BEFORE applying the Kaplan--Yorke formula.
+/-- The finite-time construction used by Wikipedia's Lyapunov dimension
+article: liminf in time of the spatial supremum. Intended for nonempty compact
+invariant sets. No interchange of the spatial supremum and time limit is
+built into this definition.
+https://en.wikipedia.org/wiki/Lyapunov_dimension#Definition_via_finite-time_Lyapunov_dimension -/
+def lyapunovDimension {n : ℕ}
+    (D : C1DynamicalSystem n) (K : Set (PhaseSpace n)) : ℝ :=
+  Filter.liminf (fun t : ℝ => finiteTimeLyapunovDimension D t K) atTop
 
-This is not a limsup of finite-time dimensions, nor the thesis's fixed-index
-formula. A spatial supremum of this function is not silently replaced by
-`liminf (sup (finite-time local dimension))`, the set-dimension construction
-in the Rössler note and Wikipedia's linked dimension article. -/
+/-- Pointwise finite-time convention: time liminf of the finite-time local
+ dimension, equivalently the same set construction on a singleton. No
+ Kaplan--Yorke formula is applied to separately taken upper exponents. -/
 def localLyapunovDimension {n : ℕ}
     (D : C1DynamicalSystem n) (u : PhaseSpace n) : ℝ :=
-  kaplanYorkeDimension n (D.upperLE u)
+  Filter.liminf (fun t : ℝ => finiteTimeLocalLyapunovDimension D t u) atTop
 
 /-! ## The thesis's Hilbert-space and s-number framework -/
 
@@ -329,34 +337,8 @@ def StationaryOrPeriodicSupremumAttainment
     (D.localLyapunovDimension N μ u0 : EReal) =
       D.supremumLocalLyapunovDimension N μ
 
-/-- One implication that needs no comparison between different definitions
-of Lyapunov dimension: an attaining stationary/periodic solution is critical
-whenever some critical path exists. All quantities refer to the same X, N,
-mu and the same thesis local dimension.
-
-Thus, on fixed data, supremum attainment is stronger than the existential
-dimension-bound assertion. The converse is not supplied by the definitions. -/
-theorem supremumAttainment_implies_stationaryOrPeriodicCriticalPath
-    (N : ℕ) (μ : ℕ → H → ℝ)
-    (hmax : D.StationaryOrPeriodicSupremumAttainment N μ)
-    (hcrit : ∃ u : H, D.CriticalPath N μ u) :
-    ∃ u : H, D.CriticalPath N μ u ∧
-      (StationarySolution D.S u ∨ PeriodicSolution D.S u) := by
-  rcases hmax with ⟨p, hp, horbit, heq⟩
-  rcases hcrit with ⟨q, hqX, hqbound⟩
-  have hqle : (D.localLyapunovDimension N μ q : EReal) ≤
-      D.supremumLocalLyapunovDimension N μ := by
-    unfold supremumLocalLyapunovDimension
-    exact le_sSup ⟨q, hqX, rfl⟩
-  have hbound : D.douadyOesterleDimension N ≤
-      (D.localLyapunovDimension N μ p : EReal) := by
-    rw [heq]
-    exact le_trans hqbound hqle
-  exact ⟨p, ⟨hp, hbound⟩, horbit⟩
-
 end ThesisSetting
 end Thesis
 
 
 end Eden
-

@@ -1,8 +1,0 @@
-import EdensConjecture.EMainProofGlobalSpectrum
-
-#print axioms Eden.PolynomialCounterexample.modern_refutation
-#print axioms Eden.PolynomialCounterexample.global_realSpectrum
-#print axioms Eden.PolynomialCounterexample.global_firstIndex
-#print axioms Eden.PolynomialCounterexample.global_thesis_no_attainment
-#print axioms Eden.PolynomialCounterexample.torusThesisSetting_critical_exists
-#print axioms Eden.PolynomialCounterexample.torusThesisSetting_no_recurrent_critical

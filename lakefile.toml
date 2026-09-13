@@ -1,6 +1,6 @@
 name = "hidden_eden_partial"
 version = "0.1.0"
-defaultTargets = ["HiddenEdenPartial"]
+defaultTargets = ["Root"]
 
 [[require]]
 name = "mathlib"
@@ -9,3 +9,14 @@ rev = "0df444a360eaa60ab8c11dca51a86af692955474"
 
 [[lean_lib]]
 name = "HiddenEdenPartial"
+
+[[lean_lib]]
+name = "EdensConjecture"
+globs = ["EdensConjecture.+"]
+
+[[lean_lib]]
+name = "Root"
+
+[[lean_lib]]
+name = "KuznetsovEdenConjecture"
+globs = ["KuznetsovEdenConjecture.+"]
