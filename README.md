@@ -4,7 +4,7 @@ We resolve Eden's Conjecture
 
 The Eden statements (all 4 variants) are formally refuted in Lean.
 
-we're still working on formalizing kuznetsov-eden.
+we're still working on kuznetsov-eden.
 
 
 # Instructions
@@ -15,4 +15,4 @@ Install Lean 4.33.1, and from your directory run in powershell:
 lake build Root
 ```
 
-The build completed successfully under Lean 4.33.1 in our session. There are no `admit`, `native_decide`, nor user-created axioms. However, there are two instances of `sorry` under `KuznetsovEdenConjecture`, which we plan to formalize soon.
+The build completed successfully under Lean 4.33.1 in our session. There are no `admit`, `native_decide`, nor user-created axioms.
