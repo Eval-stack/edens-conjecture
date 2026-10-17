@@ -72,7 +72,7 @@ theorem not_EdenConjectureEmbeddedStrange_of_noPositiveReturns
           (Eden.StationarySolution D.φ u0 ∨ D.UnstablePeriodicOrbit u0) ∧
           Eden.Orbit D.φ u0 ⊆ A ∧
           Eden.localLyapunovDimension D u0 =
-            Eden.lyapunovDimension D A) := by
+            Eden.supremumLocalLyapunovDimension D A) := by
   intro hconjecture
   rcases hconjecture n hn D A hA with
     ⟨p, hp, heligible, _horbit, _hdimension⟩
@@ -119,7 +119,7 @@ theorem refutation_of_direct_construction
           (Eden.StationarySolution D.φ u0 ∨ D.UnstablePeriodicOrbit u0) ∧
           Eden.Orbit D.φ u0 ⊆ A ∧
           Eden.localLyapunovDimension D u0 =
-            Eden.lyapunovDimension D A) := by
+            Eden.supremumLocalLyapunovDimension D A) := by
   exact not_EdenConjectureEmbeddedStrange_of_noPositiveReturns (by decide) D A
     ⟨hattr, noninteger_dimH_of_bounds hlo hhi⟩ hfree
 
@@ -157,7 +157,7 @@ theorem embeddedStrange_refutation :
           (Eden.StationarySolution D.φ u0 ∨ D.UnstablePeriodicOrbit u0) ∧
           Eden.Orbit D.φ u0 ⊆ A ∧
           Eden.localLyapunovDimension D u0 =
-            Eden.lyapunovDimension D A) := by
+            Eden.supremumLocalLyapunovDimension D A) := by
   apply refutation_of_direct_construction Direct.directSystem Direct.directAttractor
     Direct.directSystem_attractor Direct.directAttractor_dimH_lower Direct.directAttractor_dimH_upper
   intro p hp t ht

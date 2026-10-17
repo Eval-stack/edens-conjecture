@@ -1,4 +1,7 @@
-import EdensConjecture.EStatementDefinitions
+import EdensConjecture.MainProof.SpectralTools
+import Mathlib.Analysis.SpecialFunctions.ExpDeriv
+import Mathlib.Analysis.Calculus.Deriv.Prod
+import Mathlib.Analysis.Complex.RealDeriv
 
 set_option backward.isDefEq.respectTransparency false
 set_option backward.isDefEq.respectTransparency.types false

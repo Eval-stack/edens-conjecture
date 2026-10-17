@@ -1,4 +1,10 @@
-import EdensConjecture.EStatementDefinitions
+import EdensConjecture.MainProof.SpectralTools
+import Mathlib.Analysis.SpecialFunctions.ExpDeriv
+import Mathlib.Analysis.Calculus.Deriv.Inv
+import Mathlib.Analysis.Calculus.Deriv.Pi
+import Mathlib.Analysis.Calculus.Deriv.Prod
+import Mathlib.Analysis.Calculus.Deriv.MeanValue
+import Mathlib.Analysis.Complex.RealDeriv
 
 set_option backward.isDefEq.respectTransparency false
 set_option backward.isDefEq.respectTransparency.types false
@@ -413,19 +419,6 @@ lemma spectrum_CC_dimension :
     interval_cases k <;> norm_num [exponentSum, spectrum, Finset.sum_range_succ]
   norm_num [kaplanYorkeDimension, hi, exponentSum, spectrum, Finset.sum_range_succ]
 
-/-- The thesis uses N = 4 even where the pointwise KY index is smaller.
-In particular the periodic AB spectrum gives 15/4, not 3. -/
-lemma thesis_AB_ratio :
-    (4 : ℝ) + exponentSum (spectrum 2 0 (-2) (-2) (-8)) 4 / |(-8 : ℝ)| = 15 / 4 := by
-  norm_num [exponentSum, spectrum, Finset.sum_range_succ]
-
-lemma thesis_AA_AC_CC_ratio :
-    (4 : ℝ) + (-8) / |(-8 : ℝ)| = 3 := by norm_num
-
-lemma thesis_BB_ratio :
-    (4 : ℝ) + exponentSum (spectrum 2 2 0 0 (-8)) 4 / |(-8 : ℝ)| = 9 / 2 := by
-  norm_num [exponentSum, spectrum, Finset.sum_range_succ]
-
 /-- The six possible unordered pairs of radial asymptotic types. -/
 inductive SpectrumType where
   | AA | AB | AC | BB | BC | CC
@@ -447,17 +440,6 @@ lemma SpectrumType.sum_five_neg (s : SpectrumType) : exponentSum s.rates 5 < 0 :
 
 lemma SpectrumType.sum_four_le (s : SpectrumType) : exponentSum s.rates 4 ≤ 4 := by
   cases s <;> norm_num [SpectrumType.rates, exponentSum, spectrum, Finset.sum_range_succ]
-
-lemma SpectrumType.thesis_ratio_le (s : SpectrumType) :
-    (4 : ℝ) + exponentSum s.rates 4 / |s.rates 4| ≤ 9 / 2 := by
-  rw [s.fifth_rate]
-  have := s.sum_four_le
-  norm_num
-  linarith
-
-lemma SpectrumType.thesis_ratio_eq_iff (s : SpectrumType) :
-    (4 : ℝ) + exponentSum s.rates 4 / |s.rates 4| = 9 / 2 ↔ s = .BB := by
-  cases s <;> norm_num [SpectrumType.rates, exponentSum, spectrum, Finset.sum_range_succ] <;> decide
 
 lemma SpectrumType.modern_dimension_le (s : SpectrumType) :
     kaplanYorkeDimension 5 s.rates ≤ 9 / 2 := by
@@ -508,49 +490,17 @@ lemma volumeTail_torus_eq (d t : ℝ) :
 /-- A strict finite-time set-dimension gap excludes all eligible candidates. -/
 lemma no_modern_attainment_of_gap {n : ℕ} (D : C1DynamicalSystem n)
     (A : Set (PhaseSpace n)) (c : ℝ)
-    (hlarge : c < lyapunovDimension D A)
+    (hlarge : c < (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeSupremum D t A) atTop))
     (hsmall : ∀ p ∈ A, StationarySolution D.φ p ∨ PeriodicSolution D.φ p →
-      localLyapunovDimension D p ≤ c) :
+      (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue D t p) atTop) ≤ c) :
     ¬ ∃ p ∈ A,
       (StationarySolution D.φ p ∨ D.UnstablePeriodicOrbit p) ∧
       Orbit D.φ p ⊆ A ∧
-      localLyapunovDimension D p = lyapunovDimension D A := by
+      (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue D t p) atTop) = (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeSupremum D t A) atTop) := by
   rintro ⟨p, hp, hrec, _, heq⟩
   have hpdim := hsmall p hp (hrec.elim Or.inl (fun h => Or.inr h.1))
   rw [heq] at hpdim
   exact (not_lt_of_ge hpdim) hlarge
-
-/-- The thesis contradiction uses its own local dimension and extended-real
-supremum; no identification with pointwise Kaplan--Yorke is assumed. -/
-lemma no_thesis_attainment_of_gap {H : Type*} [NormedAddCommGroup H]
-    [InnerProductSpace ℝ H] [CompleteSpace H] (D : ThesisSetting H)
-    (N : ℕ) (μ : ℕ → H → ℝ) (c : ℝ)
-    (hlarge : ∃ p ∈ D.X, c < D.localLyapunovDimension N μ p)
-    (hsmall : ∀ p ∈ D.X, StationarySolution D.S p ∨ PeriodicSolution D.S p →
-      D.localLyapunovDimension N μ p ≤ c) :
-    ¬ D.StationaryOrPeriodicSupremumAttainment N μ := by
-  rintro ⟨p, hp, hrec, heq⟩
-  rcases hlarge with ⟨q, hq, hqdim⟩
-  have hle : (D.localLyapunovDimension N μ q : EReal) ≤
-      D.supremumLocalLyapunovDimension N μ :=
-    le_sSup (Set.mem_image_of_mem _ hq)
-  rw [← heq] at hle
-  have hreal : D.localLyapunovDimension N μ q ≤ D.localLyapunovDimension N μ p :=
-    EReal.coe_le_coe_iff.mp hle
-  exact (not_lt_of_ge (hreal.trans (hsmall p hp hrec))) hqdim
-
-lemma no_thesis_recurrent_critical_path_of_gap {H : Type*} [NormedAddCommGroup H]
-    [InnerProductSpace ℝ H] [CompleteSpace H] (D : ThesisSetting H)
-    (N : ℕ) (μ : ℕ → H → ℝ) (c : ℝ)
-    (hbound : (c : EReal) < D.douadyOesterleDimension N)
-    (hsmall : ∀ p ∈ D.X, StationarySolution D.S p ∨ PeriodicSolution D.S p →
-      D.localLyapunovDimension N μ p ≤ c) :
-    ¬ ∃ p, D.CriticalPath N μ p ∧
-      (StationarySolution D.S p ∨ PeriodicSolution D.S p) := by
-  rintro ⟨p, ⟨hp, hcrit⟩, hrec⟩
-  have hle : (D.localLyapunovDimension N μ p : EReal) ≤ (c : EReal) :=
-    EReal.coe_le_coe_iff.mpr (hsmall p hp hrec)
-  exact (not_lt_of_ge (hcrit.trans hle)) hbound
 
 /-! ## The full solution operator -/
 

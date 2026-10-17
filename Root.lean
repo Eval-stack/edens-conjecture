@@ -1,13 +1,9 @@
 import EdensConjecture.EChains
+import EdensConjecture.DefinitionCheck
 import EdensConjecture.MainProof.Torus
-import EdensConjecture.MainProof.Refutations
 import EdensConjecture.MainProof.Flow
-import EdensConjecture.MainProof.GlobalSpectrum
-import EdensConjecture.MainProof.Lift
 import EdensConjecture.MainProof.Regularity
-import EdensConjecture.MainProof.SNumbers
 import EdensConjecture.MainProof.Spectral
-import EdensConjecture.MainProof.Thesis
 import EdensConjecture.MainProof.Volume
 import EdensConjecture.EStatements
 import EdensConjecture.EStatementDefinitions

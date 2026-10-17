@@ -1,6 +1,9 @@
 # Lake dependencies and build output
 /.lake/
 
+# Local Lean toolchain selection
+/lean-toolchain
+
 # Lean artifacts generated alongside source files
 *.olean
 *.olean.server

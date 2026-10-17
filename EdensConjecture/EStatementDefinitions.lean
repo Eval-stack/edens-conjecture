@@ -1,4 +1,11 @@
-import Mathlib
+import Mathlib.Analysis.Calculus.ContDiff.Operations
+import Mathlib.Analysis.Calculus.Deriv.Basic
+import Mathlib.Analysis.InnerProductSpace.PiL2
+import Mathlib.Analysis.InnerProductSpace.SingularValues
+import Mathlib.Analysis.SpecialFunctions.Pow.Real
+import Mathlib.Topology.MetricSpace.HausdorffDimension
+import Mathlib.Topology.Algebra.Order.LiminfLimsup
+import Mathlib.Tactic
 
 noncomputable section
 
@@ -10,7 +17,7 @@ namespace Eden
 /-!
 # Definitions
 
-This file defines terminology used to state Eden's Conjecture and its variants in `EStatement.lean`. Additional proof-specific definitions are in the `MainProof` folder.
+This file defines terminology used to state Eden's Conjecture and its variants in `EStatements.lean`. Additional proof-specific definitions are in the `MainProof` folder.
 -/
 
 /-! ## Elementary trajectory terminology -/
@@ -145,200 +152,111 @@ def kaplanYorkeDimension (n : ℕ) (rates : ℕ → ℝ) : ℝ :=
   if j = n then (n : ℝ)
   else (j : ℝ) + exponentSum rates j / |rates j|
 
-/-- Kaplan--Yorke dimension of the singular-value exponents at time t > 0. -/
-def finiteTimeLocalLyapunovDimension {n : ℕ}
-    (D : C1DynamicalSystem n) (t : ℝ) (u : PhaseSpace n) : ℝ :=
-  kaplanYorkeDimension n (D.finiteTimeLE t u)
+/-! ## Singular-value functions and Lyapunov dimensions -/
 
-/-- Spatial supremum at a fixed positive time, before taking any time limit. -/
+/-- The singular-value function ω_d(A). For integer d this is the product
+of the first d singular values, including the empty product ω_0(A) = 1.
+For noninteger d, interpolate with σ_(⌊d⌋+1)^(d-⌊d⌋).
+Only orders d ∈ [0,n] are used in the dimension definitions. -/
+def singularValueFunction {n : ℕ} (A : PhaseSpace n →ₗ[ℝ] PhaseSpace n)
+    (d : ℝ) : ℝ :=
+  let k := ⌊d⌋₊
+  let product := ∏ i ∈ Finset.range k, A.singularValues i
+  if d = (k : ℝ) then product
+  else product * Real.rpow (A.singularValues k) (d - (k : ℝ))
+
+namespace C1DynamicalSystem
+
+variable {n : ℕ} (D : C1DynamicalSystem n)
+
+/-- ω_d(Dφᵗ(u)), with zero-based singular-value indexing. -/
+def ω (d t : ℝ) (u : PhaseSpace n) : ℝ :=
+  singularValueFunction (fderiv ℝ (D.φ t) u).toLinearMap d
+
+/-- t⁻¹ log ω_d(Dφᵗ(u)). The extended-real logarithm assigns -∞ at zero.
+Only positive times are relevant to the limits below. -/
+def singularValueGrowth (d t : ℝ) (u : PhaseSpace n) : EReal :=
+  ((t⁻¹ : ℝ) : EReal) *
+    (if D.ω d t u = 0 then ⊥ else (Real.log (D.ω d t u) : EReal))
+
+/-- Upper exponential growth rate of ω_d(Dφᵗ(u)), preserving infinite rates. -/
+def upperSingularValueGrowth (d : ℝ) (u : PhaseSpace n) : EReal :=
+  Filter.limsup (fun t : ℝ => D.singularValueGrowth d t u) atTop
+
+/-- S_k(u) = limsup_(t→∞) ∑_(i=1)^k ν_i(t,u), with S_0 = 0.
+The real-valued convention is intended for finite rates on compact invariant sets. -/
+def cumulativeUpperLE (u : PhaseSpace n) (k : ℕ) : ℝ :=
+  if k = 0 then 0
+  else Filter.limsup (fun t : ℝ => exponentSum (D.finiteTimeLE t u) k) atTop
+
+/-- Relative upper exponent ν̂_(i+1) = S_(i+1) - S_i (zero-based indexing). -/
+def relativeUpperLE (u : PhaseSpace n) (i : ℕ) : ℝ :=
+  D.cumulativeUpperLE u (i + 1) - D.cumulativeUpperLE u i
+
+end C1DynamicalSystem
+
+/-- Canonical local Lyapunov dimension:
+inf {d ∈ [0,n] : limsup_(t→∞) t⁻¹ log ω_d(Dφᵗ(u)) < 0}.
+The finite-dimensional endpoint convention assigns n when the contraction
+set is empty. Inserting n implements the infimum in the bounded interval.
+This is dimᴱ_L in the updated manuscript, Definition 9. -/
+def localLyapunovDimension {n : ℕ}
+    (D : C1DynamicalSystem n) (u : PhaseSpace n) : EReal :=
+  sInf (insert (n : EReal) {a : EReal | ∃ d : ℝ,
+    d ∈ Icc (0 : ℝ) (n : ℝ) ∧ a = (d : EReal) ∧ D.upperSingularValueGrowth d u < 0})
+
+/-- D₅: Kaplan--Yorke formula applied to the separately taken upper
+singular-value exponents ν̄_i(u) = limsup_(t→∞) ν_i(t,u). -/
+def kaplanYorkeDimensionOfUpperLE {n : ℕ}
+    (D : C1DynamicalSystem n) (u : PhaseSpace n) : ℝ :=
+  kaplanYorkeDimension n (D.upperLE u)
+
+/-- D₆: Kaplan--Yorke formula applied to the relative upper exponents
+ν̂_j(u) = S_j(u) - S_(j-1)(u). -/
+def kaplanYorkeDimensionOfRelativeUpperLE {n : ℕ}
+    (D : C1DynamicalSystem n) (u : PhaseSpace n) : ℝ :=
+  kaplanYorkeDimension n (D.relativeUpperLE u)
+
+/-- Local dimension of the single map φᵗ, from Definition 9:
+sup {d ∈ [0,n] : ω_d(Dφᵗ(u)) > 1}. Empty sets have value 0.
+The strict inequality is the manuscript's convention. -/
+def finiteTimeLyapunovDimensionAt {n : ℕ}
+    (D : C1DynamicalSystem n) (t : ℝ) (u : PhaseSpace n) : ℝ :=
+  sSup {d : ℝ | d ∈ Icc (0 : ℝ) (n : ℝ) ∧ 1 < D.ω d t u}
+
+/-- Lyapunov dimension of the single map φᵗ on K. -/
 def finiteTimeLyapunovDimension {n : ℕ}
     (D : C1DynamicalSystem n) (t : ℝ) (K : Set (PhaseSpace n)) : ℝ :=
-  sSup (finiteTimeLocalLyapunovDimension D t '' K)
+  sSup (finiteTimeLyapunovDimensionAt D t '' K)
 
-/-- The finite-time construction used by Wikipedia's Lyapunov dimension
-article: liminf in time of the spatial supremum. Intended for nonempty compact
-invariant sets. No interchange of the spatial supremum and time limit is
-built into this definition.
-https://en.wikipedia.org/wiki/Lyapunov_dimension#Definition_via_finite-time_Lyapunov_dimension -/
+/-- Lyapunov dimension of the dynamical system on K:
+inf_(t>0) dim_L(φᵗ,K), as in Definition 9 of the updated manuscript. -/
 def lyapunovDimension {n : ℕ}
     (D : C1DynamicalSystem n) (K : Set (PhaseSpace n)) : ℝ :=
-  Filter.liminf (fun t : ℝ => finiteTimeLyapunovDimension D t K) atTop
+  sInf {a : ℝ | ∃ t : ℝ, 0 < t ∧ a = finiteTimeLyapunovDimension D t K}
 
-/-- Pointwise finite-time convention: time liminf of the finite-time local
- dimension, equivalently the same set construction on a singleton. No
- Kaplan--Yorke formula is applied to separately taken upper exponents. -/
-def localLyapunovDimension {n : ℕ}
-    (D : C1DynamicalSystem n) (u : PhaseSpace n) : ℝ :=
-  Filter.liminf (fun t : ℝ => finiteTimeLocalLyapunovDimension D t u) atTop
-
-/-! ## The thesis's Hilbert-space and s-number framework -/
-
-section Thesis
-
-variable {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
-  [CompleteSpace H]
-
-/-- Compact + strict contraction. For a bounded linear map between Hilbert
-spaces, compactness is equivalently relative compactness of the unit-ball image. -/
-def CCOperator (A : H →L[ℝ] H) : Prop :=
-  ∃ K C : H →L[ℝ] H,
-    A = K + C ∧
-    IsCompact (closure (K '' Metric.closedBall (0 : H) 1)) ∧ ‖C‖ < 1
-
-/-- P is precisely the positive part (A* A)^(1/2): self-adjoint, positive,
-and P*P = A*A. This relational characterization avoids choosing an arbitrary
-operator under the name "positive part". -/
-def PositivePart (A P : H →L[ℝ] H) : Prop :=
-  (∀ x y : H, inner ℝ (P x) y = inner ℝ x (P y)) ∧
-  (∀ x : H, 0 ≤ inner ℝ (P x) x) ∧
-  (∀ x y : H, inner ℝ (P x) (P y) = inner ℝ (A x) (A y))
-
-/-- Eden II.2.1, the inf--sup formula for s_j, with j >= 1. The explicit
-FiniteDimensional condition prevents the default finrank of an infinite-
-dimensional subspace from passing the dimension bound. -/
-def sNumber (P : H →L[ℝ] H) (j : ℕ) : ℝ :=
-  sInf {a : ℝ | ∃ F : Submodule ℝ H,
-    FiniteDimensional ℝ F ∧ Module.finrank ℝ F ≤ j - 1 ∧
-    a = sSup {b : ℝ | ∃ u : H,
-      ‖u‖ = 1 ∧
-      (∀ v : H, v ∈ F → inner ℝ u v = 0) ∧
-      b = inner ℝ (P u) u}}
-
-/-- Nonlinear semigroup and the hypotheses used in the thesis's local
-Hausdorff-dimension estimate. The compact invariant set need not be asserted
-to be a strange attractor or a global attractor. -/
-structure ThesisSetting (H : Type*) [NormedAddCommGroup H]
-    [InnerProductSpace ℝ H] [CompleteSpace H] where
-  X : Set H
-  nonempty_X : X.Nonempty
-  compact_X : IsCompact X
-  S : ℝ → H → H
-  initial : ∀ u : H, S 0 u = u
-  semigroup : ∀ t s : ℝ, 0 ≤ t → 0 ≤ s →
-    ∀ u : H, S (t + s) u = S t (S s u)
-  continuous_space : ∀ t : ℝ, 0 ≤ t → Continuous (S t)
-  continuous_on_X :
-    ContinuousOn (fun p : ℝ × H => S p.1 p.2) ((Ioi 0) ×ˢ X)
-  invariant_X : ∀ t : ℝ, 0 ≤ t → S t '' X = X
-  S' : ℝ → H → H →L[ℝ] H
-  derivative_continuous :
-    ContinuousOn (fun p : ℝ × H => S' p.1 p.2) ((Ioi 0) ×ˢ X)
-  derivative_injective : ∀ t : ℝ, 0 < t → ∀ u ∈ X,
-    Function.Injective (S' t u)
-  derivative_CC : ∀ t : ℝ, 0 < t → ∀ u ∈ X, CCOperator (S' t u)
-  derivative_cocycle : ∀ t s : ℝ, 0 < t → 0 < s → ∀ u ∈ X,
-    S' (t + s) u = (S' t (S s u)).comp (S' s u)
-  short_time_bound : ∃ M : ℝ, ∀ t : ℝ, 0 < t → t ≤ 1 →
-    ∀ u ∈ X, ‖S' t u‖ ≤ M
-  P : ℝ → H → H →L[ℝ] H
-  positive_part : ∀ t : ℝ, 0 < t → ∀ u ∈ X,
-    PositivePart (S' t u) (P t u)
-  c : ℝ → ℝ
-  remainder : ℝ → ℝ
-  c_nonneg : ∀ t : ℝ, 0 < t → 0 ≤ c t
-  remainder_nonneg : ∀ r : ℝ, 0 ≤ r → 0 ≤ remainder r
-  remainder_zero : remainder 0 = 0
-  remainder_small :
-    Tendsto (fun r : ℝ => remainder r / r) (𝓝[>] 0) (𝓝 0)
-  frechet_type_condition : ∀ t : ℝ, 0 < t → ∀ u ∈ X, ∀ u0 ∈ X,
-    ‖S t u - S t u0 - S' t u0 (u - u0)‖ ≤ c t * remainder ‖u - u0‖
-
-namespace ThesisSetting
-
-variable (D : ThesisSetting H)
-
-/-- s_j(t,u), with the thesis's one-based indexing. -/
-def s (j : ℕ) (t : ℝ) (u : H) : ℝ :=
-  sNumber (D.P t u) j
-
-/-- w_k(t,u) = s_1(t,u) ... s_k(t,u), thesis III.3.7. -/
-def w (k : ℕ) (t : ℝ) (u : H) : ℝ :=
-  ∏ i ∈ Finset.range k, D.s (i + 1) t u
-
-/-- log 0 = -infinity, not Lean's real-log-at-zero convention. Only
-nonnegative inputs occur in the defining spectral expressions. -/
-def extendedLog (r : ℝ) : EReal :=
-  if r = 0 then ⊥ else (Real.log r : EReal)
-
-/-- The cumulative LOCAL exponents use LIMSUP, not a presumed limit.
-This is thesis II.4.8 / III.3.14. -/
-def cumulativeLocalExponent (k : ℕ) (u : H) : EReal :=
-  Filter.limsup
-    (fun t : ℝ => ((t⁻¹ : ℝ) : EReal) * extendedLog (D.w k t u)) atTop
-
-/-- The precise regime in which the displayed local-exponent ratio below
-uses real numbers. This is an explicit hypothesis, not conversion of
-infinite exponents to real zero. The same mu is constrained by every
-cumulative equality up to N+1. -/
-def RealLocalSpectrumThrough (N : ℕ) (μ : ℕ → H → ℝ) : Prop :=
-  ∀ u ∈ D.X, ∀ k : ℕ, k ≤ N + 1 →
-    ((∑ i ∈ Finset.range k, μ (i + 1) u : ℝ) : EReal) =
-      D.cumulativeLocalExponent k u
-
-/-- N is the FIRST integer for which the (N+1)-term local sum is negative
-at EVERY point of X. N is globally fixed, not reselected at each u. -/
-def FirstDimensionIndex (N : ℕ) (μ : ℕ → H → ℝ) : Prop :=
-  (∀ u ∈ D.X, (∑ i ∈ Finset.range (N + 1), μ (i + 1) u) < 0) ∧
-  (∀ m : ℕ, m < N →
-    ¬ (∀ u ∈ D.X, (∑ i ∈ Finset.range (m + 1), μ (i + 1) u) < 0))
-
-/-- Thesis III.1.3. Deliberately no pointwise Kaplan--Yorke reindexing,
-no clipping at 0 or N, and no maximum substituted for this ratio. -/
-def localLyapunovDimension (_D : ThesisSetting H)
-    (N : ℕ) (μ : ℕ → H → ℝ) (u0 : H) : ℝ :=
-  (N : ℝ) + (∑ i ∈ Finset.range N, μ (i + 1) u0) / |μ (N + 1) u0|
-
-/-- The fixed-N singular-value expression used in III.1.26--1.28. -/
-def dimensionExpression (N : ℕ) (d t : ℝ) (u : H) : ℝ :=
-  D.w N t u * Real.rpow (D.s (N + 1) t u) (d - (N : ℝ))
-
-/-- d_DO = inf{d > 0 : sup_X w_N(t,u) s_(N+1)(t,u)^(d-N) -> 0}.
-The codomain EReal makes infimum of the empty set +infinity, as the
-thesis explicitly prescribes. Convergence to zero is NOT replaced by
-exponential convergence (that is the distinct Remark III.1.38). -/
-def douadyOesterleDimension (N : ℕ) : EReal :=
+/-- The manuscript's global exponential-growth dimension dimᴱ_L({φᵗ},K).
+The spatial maximum is expressed as a supremum. A strictly negative limiting
+rate must exist, matching the manuscript's limit rather than assuming it.
+The empty infimum has value +∞. No equality with `lyapunovDimension` is
+asserted here; Proposition 10 requires a separate proof and its hypotheses. -/
+def globalLyapunovDimension {n : ℕ}
+    (D : C1DynamicalSystem n) (K : Set (PhaseSpace n)) : EReal :=
   sInf {a : EReal | ∃ d : ℝ,
-    0 < d ∧ a = (d : EReal) ∧
-    Tendsto
-      (fun t : ℝ => sSup (D.dimensionExpression N d t '' D.X))
-      atTop (𝓝 (0 : ℝ))}
+    d ∈ Icc (0 : ℝ) (n : ℝ) ∧ a = (d : EReal) ∧
+      ∃ rate : EReal, rate < 0 ∧
+        Tendsto (fun t : ℝ => sSup (D.singularValueGrowth d t '' K)) atTop (𝓝 rate)}
 
-/-- The dimension-bound use of "critical path" on printed p.97.
-This is NOT asserted to be the thesis's only use of that terminology. -/
-def CriticalPath (N : ℕ) (μ : ℕ → H → ℝ) (u0 : H) : Prop :=
-  u0 ∈ D.X ∧
-    D.douadyOesterleDimension N ≤ (D.localLyapunovDimension N μ u0 : EReal)
+/-- Spatial supremum of the canonical local Lyapunov dimensions.
+This is the target in the manuscript's global Eden conjecture. -/
+def supremumLocalLyapunovDimension {n : ℕ}
+    (D : C1DynamicalSystem n) (K : Set (PhaseSpace n)) : EReal :=
+  sSup (localLyapunovDimension D '' K)
 
-
-/-- Global attraction of X in the ambient Hilbert space.
-Compactness, nonemptiness and invariance are already fields of the setting.
-This additional property is used by the global supremum-attainment reading,
-not by the compact-invariant-set reading of Question 1. -/
-def IsGlobalAttractor : Prop :=
-  ∀ B : Set H, Bornology.IsBounded B →
-    ∀ ε : ℝ, 0 < ε →
-      ∃ T : ℝ, 0 ≤ T ∧
-        ∀ t : ℝ, T ≤ t → ∀ u ∈ B,
-          ∃ v ∈ D.X, dist (D.S t u) v < ε
-
-/-- The supremum of the thesis's local dimensions on X.
-The use of EReal makes an unbounded-above image have supremum +infinity;
-it does not turn an unbounded real supremum into Lean's default real value. -/
-def supremumLocalLyapunovDimension (N : ℕ) (μ : ℕ → H → ℝ) : EReal :=
-  sSup ((fun u : H => (D.localLyapunovDimension N μ u : EReal)) '' D.X)
-
-/-- Supremum attainment by a stationary or periodic solution, using exactly
-III.1.3 for the local dimension. This is a maximizing-path condition;
-`CriticalPath` instead requires only the non-strict dimension bound. -/
-def StationaryOrPeriodicSupremumAttainment
-    (N : ℕ) (μ : ℕ → H → ℝ) : Prop :=
-  ∃ u0 ∈ D.X,
-    (StationarySolution D.S u0 ∨ PeriodicSolution D.S u0) ∧
-    (D.localLyapunovDimension N μ u0 : EReal) =
-      D.supremumLocalLyapunovDimension N μ
-
-end ThesisSetting
-end Thesis
-
+/-- Finite-dimensional critical-path condition, using the canonical local
+dimension and the manuscript's set dimension. -/
+def CriticalPath {n : ℕ} (D : C1DynamicalSystem n)
+    (K : Set (PhaseSpace n)) (u : PhaseSpace n) : Prop :=
+  u ∈ K ∧ (lyapunovDimension D K : EReal) ≤ localLyapunovDimension D u
 
 end Eden

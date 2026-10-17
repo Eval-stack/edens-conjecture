@@ -90,11 +90,6 @@ lemma derivative_short_time_bound : ∃ M : ℝ, ∀ t : ℝ, 0 < t → t ≤ 1 
   obtain ⟨M, hM⟩ := hc.exists_bound_of_continuousOn hcont
   exact ⟨M, fun t ht ht₁ x hx => hM (t, x) ⟨⟨ht.le, ht₁⟩, hx⟩⟩
 
-lemma finiteDimensional_CC {H : Type*} [NormedAddCommGroup H] [InnerProductSpace ℝ H]
-    [FiniteDimensional ℝ H] (A : H →L[ℝ] H) : CCOperator A := by
-  refine ⟨A, 0, by simp, ?_, by simp⟩
-  exact ((isCompact_closedBall (0 : H) 1).image A.continuous).closure
-
 lemma compact_smooth_remainder {H G : Type*} [NormedAddCommGroup H] [NormedSpace ℝ H]
     [NormedAddCommGroup G] [NormedSpace ℝ G] {f : H → G} (hf : ContDiff ℝ ⊤ f)
     {A : Set H} (hA : IsCompact A) (hconv : Convex ℝ A) :

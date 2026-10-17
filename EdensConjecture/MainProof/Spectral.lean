@@ -11,6 +11,22 @@ open scoped BigOperators Topology ComplexConjugate
 namespace Eden
 namespace PolynomialCounterexample
 
+/-- The irrational torus is invariant under the polynomial flow. -/
+lemma flow_image_T {t : ℝ} (ht : 0 ≤ t) : flow t '' T = T := by
+  apply Set.Subset.antisymm
+  · rintro _ ⟨x, hx, rfl⟩
+    exact ⟨by rw [q₁_flow ht, hx.1, squaredRadius_at_one],
+      by rw [q₂_flow ht, hx.2.1, squaredRadius_at_one], by simp [flow, hx.2.2]⟩
+  · intro x hx
+    have hxK : x ∈ flow t '' K := by rw [flow_image_K ht]; exact T_subset_K hx
+    obtain ⟨y, hy, hxy⟩ := hxK
+    refine ⟨y, ?_, hxy⟩
+    refine ⟨?_, ?_, hy.2.2⟩
+    · apply (strictMono_squaredRadius ht).injective
+      rw [squaredRadius_at_one, ← q₁_flow ht, hxy, hx.1]
+    · apply (strictMono_squaredRadius ht).injective
+      rw [squaredRadius_at_one, ← q₂_flow ht, hxy, hx.2.1]
+
 lemma kaplanYorkeIndex_le (n : ℕ) (rates : ℕ → ℝ) : kaplanYorkeIndex n rates ≤ n := by
   apply csSup_le
   · exact ⟨0, Nat.zero_le _, by simp [exponentSum]⟩
@@ -48,9 +64,9 @@ lemma kaplanYorkeDimension_le (n : ℕ) (rates : ℕ → ℝ) : kaplanYorkeDimen
     have hcast : (j : ℝ) + 1 ≤ n := by exact_mod_cast hjn
     linarith
 
-lemma finiteTimeLyapunovDimension_le {n : ℕ} (D : C1DynamicalSystem n)
+lemma finiteTimeKaplanYorkeSupremum_le {n : ℕ} (D : C1DynamicalSystem n)
     (A : Set (PhaseSpace n)) (hA : A.Nonempty) (t : ℝ) :
-    finiteTimeLyapunovDimension D t A ≤ n := by
+    finiteTimeKaplanYorkeSupremum D t A ≤ n := by
   apply csSup_le (hA.image _)
   rintro d ⟨x, _, rfl⟩
   exact kaplanYorkeDimension_le n (D.finiteTimeLE t x)
@@ -58,11 +74,11 @@ lemma finiteTimeLyapunovDimension_le {n : ℕ} (D : C1DynamicalSystem n)
 lemma local_dimension_eq_of_constant_rates {n : ℕ} (D : C1DynamicalSystem n)
     (x : PhaseSpace n) (rates : ℕ → ℝ)
     (hc : ∀ t : ℝ, 0 < t → D.finiteTimeLE t x = rates) :
-    localLyapunovDimension D x = kaplanYorkeDimension n rates := by
-  have he : (fun t : ℝ => finiteTimeLocalLyapunovDimension D t x)
+    (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue D t x) atTop) = kaplanYorkeDimension n rates := by
+  have he : (fun t : ℝ => finiteTimeKaplanYorkeValue D t x)
       =ᶠ[atTop] (fun _ => kaplanYorkeDimension n rates) := by
     filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
-    simp only [finiteTimeLocalLyapunovDimension, hc t ht]
+    simp only [finiteTimeKaplanYorkeValue, hc t ht]
   exact (tendsto_const_nhds.congr' he.symm).liminf_eq
 
 lemma singularValues_eq_of_charpoly {n : ℕ} (A : PhaseSpace n →ₗ[ℝ] PhaseSpace n)
@@ -496,8 +512,8 @@ lemma torus_finiteTimeLE_all {t : ℝ} (ht : 0 < t) {x : X} (hx : x ∈ T) : sys
     have h4 : i ≠ 4 := by omega
     simp [spectrum, h0, h1, h2, h3, h4]
 
-lemma torus_localLyapunovDimension {x : X} (hx : x ∈ T) :
-    localLyapunovDimension system x = 9 / 2 := by
+lemma torus_kaplanYorkeLowerLimit {x : X} (hx : x ∈ T) :
+    (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue system t x) atTop) = 9 / 2 := by
   rw [local_dimension_eq_of_constant_rates system x _ (fun t ht => torus_finiteTimeLE_all ht hx),
     spectrum_BB_dimension]
 
@@ -636,7 +652,7 @@ lemma equilibrium_finiteTimeLE_all (r s : RadialType) {t : ℝ} (ht : 0 < t) {a 
     simp
 
 lemma equilibrium_local_dimension (r s : RadialType) {a b : ℂ} (ha : ‖a‖ = 1) (hb : ‖b‖ = 1) :
-    localLyapunovDimension system (pack (r.point a) (s.point b) 0) =
+    (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue system t (pack (r.point a) (s.point b) 0)) atTop) =
       kaplanYorkeDimension 5 (radialPairSpectrum r s).rates := by
   exact local_dimension_eq_of_constant_rates system _ _
     (fun t ht => equilibrium_finiteTimeLE_all r s ht ha hb)
@@ -660,7 +676,7 @@ lemma exists_radialType (z : ℂ) (hz : ‖z‖ ^ 2 = 0 ∨ ‖z‖ ^ 2 = 1 ∨ 
 
 lemma recurrent_local_dimension_le_three {x : X}
     (hx : StationarySolution flow x ∨ PeriodicSolution flow x) :
-    localLyapunovDimension system x ≤ 3 := by
+    (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue system t x) atTop) ≤ 3 := by
   have hclass : (q₁ x = 0 ∨ q₁ x = 1 ∨ q₁ x = 2) ∧
       (q₂ x = 0 ∨ q₂ x = 1 ∨ q₂ x = 2) ∧ (fstC x = 0 ∨ sndC x = 0) ∧ x 4 = 0 := by
     rcases hx with hx | hx
@@ -681,36 +697,36 @@ lemma recurrent_local_dimension_le_three {x : X}
   · cases r <;> simp only [radialPairSpectrum, SpectrumType.rates,
       spectrum_AA_dimension, spectrum_AB_dimension, spectrum_AC_dimension] <;> norm_num
 
-lemma finiteTime_set_dimension_lower : (9 : ℝ) / 2 ≤ lyapunovDimension system K := by
+lemma finiteTime_set_dimension_lower : (9 : ℝ) / 2 ≤ (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeSupremum system t K) atTop) := by
   have hK : K.Nonempty := nonempty_T.mono T_subset_K
   have hb : IsBoundedUnder (· ≤ ·) atTop
-      (fun t : ℝ => finiteTimeLyapunovDimension system t K) :=
-    isBoundedUnder_of ⟨5, fun t => finiteTimeLyapunovDimension_le system K hK t⟩
+      (fun t : ℝ => finiteTimeKaplanYorkeSupremum system t K) :=
+    isBoundedUnder_of ⟨5, fun t => finiteTimeKaplanYorkeSupremum_le system K hK t⟩
   apply le_liminf_of_le hb.isCobounded_ge
   filter_upwards [eventually_gt_atTop (0 : ℝ)] with t ht
   obtain ⟨x, hx⟩ := nonempty_T
-  have hbounded : BddAbove (finiteTimeLocalLyapunovDimension system t '' K) := by
+  have hbounded : BddAbove (finiteTimeKaplanYorkeValue system t '' K) := by
     refine ⟨5, ?_⟩
     rintro d ⟨y, _, rfl⟩
     exact kaplanYorkeDimension_le 5 _
   have hle := le_csSup hbounded
-    (Set.mem_image_of_mem (finiteTimeLocalLyapunovDimension system t) (T_subset_K hx))
-  simpa only [finiteTimeLyapunovDimension, finiteTimeLocalLyapunovDimension, torus_finiteTimeLE_all ht hx,
+    (Set.mem_image_of_mem (finiteTimeKaplanYorkeValue system t) (T_subset_K hx))
+  simpa only [finiteTimeKaplanYorkeSupremum, finiteTimeKaplanYorkeValue, torus_finiteTimeLE_all ht hx,
     spectrum_BB_dimension] using hle
 
 theorem modern_no_attainment :
     ¬ ∃ x ∈ K, (StationarySolution system.φ x ∨ system.UnstablePeriodicOrbit x) ∧
-      Orbit system.φ x ⊆ K ∧ localLyapunovDimension system x = lyapunovDimension system K := by
+      Orbit system.φ x ⊆ K ∧ (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue system t x) atTop) = (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeSupremum system t K) atTop) := by
   apply no_modern_attainment_of_gap system K 3
   · linarith [finiteTime_set_dimension_lower]
   · intro x _ hx
     exact recurrent_local_dimension_le_three hx
 
-theorem modern_refutation :
+theorem finiteTime_refutation :
     ¬ (∀ n : ℕ, 0 < n → ∀ D : C1DynamicalSystem n,
       ∀ A : Set (PhaseSpace n), D.GlobalAttractor A →
         ∃ x ∈ A, (StationarySolution D.φ x ∨ D.UnstablePeriodicOrbit x) ∧ Orbit D.φ x ⊆ A ∧
-          localLyapunovDimension D x = lyapunovDimension D A) := by
+          (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeValue D t x) atTop) = (Filter.liminf (fun t : ℝ => finiteTimeKaplanYorkeSupremum D t A) atTop)) := by
   intro h
   exact modern_no_attainment (h 5 (by norm_num) system K system_globalAttractor)
 
