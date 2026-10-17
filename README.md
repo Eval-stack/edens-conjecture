@@ -16,3 +16,10 @@ lake build Root
 ```
 
 The build completed successfully under Lean 4.33.1 in our session. There are no `admit`, `native_decide`, nor user-created axioms.
+
+
+# Credit
+
+Evan Li, Lily Zhang.
+Much of the counterexample construction was assisted by GPT-6 Astra. The authors independently
+searched the literature to verify the findings.
